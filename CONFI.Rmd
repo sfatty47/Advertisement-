@@ -1,0 +1,409 @@
+---
+title: "Project"
+author: "SANKUNG"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# Load the libraries
+library(twang)
+library(WeightIt)
+library(dplyr)
+library(ggplot2)
+```
+
+
+
+
+
+$ In a randomized controlled trial (RCT), the potential outcomes can be related to the treatment assignment variable \(D\) as follows:
+\[
+Y_i = Y_i^0 + (Y_i^1 - Y_i^0)D_i
+\]
+where \(D_i\) is a binary variable indicating treatment assignment for marketing campaign (1 for treatment, 0 for control), and \(Y_i\) is the observed outcome for individual \(i\). The potential outcomes \(Y_i^0\) and \(Y_i^1\) represent what the outcome would be under control and treatment, respectively. The Average Treatment Effect (ATE) is then given by:
+\[
+ATE = E[Y_i^1 - Y_i^0] = E[Y_i|D=1] - E[Y_i|D=0]
+\]$
+
+```{r}
+df <- read.csv("/Users/sankungfatty/Desktop/R Files/bank.csv")
+tail(df)
+```
+
+ 
+
+```{r}
+# Data preparation
+df$deposit <- factor(df$deposit, levels = c("no", "yes"))
+df$education <- factor(df$education, levels = c("primary", "secondary", "tertiary", "unknown"))
+
+# Plotting
+par(mfrow=c(1,2), mar=c(4,4,2,2))  # Setting up the layout
+
+# Pie chart
+pie_data <- table(df$deposit)
+colors <- c("#FA5858", "#64FE2E")
+labels <- c("Did not Open Term Subscriptions", "Opened Term Subscriptions")
+
+pie(pie_data, labels = labels, col = colors, main = "Information on Term Subscriptions", cex.main = 1.5,
+    cex = 1.2, explode = c(0, 0.25), 
+    percent = "%1.2f%%", shadow = TRUE, angle = 25)
+
+# Bar chart
+bar_data <- df %>% 
+  group_by(education, deposit) %>% 
+  summarize(count = n()) %>% 
+  mutate(percentage = count / sum(count) * 100)
+
+bar_plot <- ggplot(bar_data, aes(x = education, y = percentage, fill = deposit)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Information on Term Subscriptions",
+       y = "(%)",
+       x = "Education Level") +
+  theme_minimal()
+
+print(bar_plot)
+
+```
+```{r}
+# Set up the base plot
+fig <- ggplot() + theme_minimal() + theme(plot.title = element_text(hjust = 0.5))
+
+# Subplot 1
+fig <- fig + geom_boxplot(data = df, aes(x = default, y = balance, fill = deposit), width = 0.7) +
+  labs(title = "Amount of Balance by Term Subscriptions") +
+  scale_fill_manual(values = c("#FA5858", "#64FE2E"), name = "Deposit")
+
+# Subplot 2
+fig <- fig + geom_boxplot(data = df, aes(x = job, y = balance, fill = deposit), width = 0.7) +
+  labs(title = "Type of Work by Term Subscriptions") +
+  scale_fill_manual(values = c("#FA5858", "#64FE2E"), name = "Deposit") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+# Subplot 3
+fig <- fig + geom_violin(data = df, aes(x = education, y = balance, fill = deposit), width = 0.7) +
+  labs(title = "Distribution of Balance by Education") +
+  scale_fill_manual(values = c("#FA5858", "#64FE2E"), name = "Deposit")
+
+# Show the plot
+print(fig)
+
+```
+```{r}
+
+# Create a new variable combining 'marital' and 'education'
+df$marital_education <- paste(df$marital, df$education, sep = "/")
+
+# Group by 'marital/education' and calculate the median balance
+education_groups <- df %>%
+  group_by(marital_education) %>%
+  summarise(median_balance = median(balance)) %>%
+  arrange(desc(median_balance))
+
+# Define a color palette
+colors <- scales::brewer_pal(palette = "Set3")(length(unique(education_groups$marital_education)))
+
+# Create the bar plot with different colors
+bar_plot <- ggplot(education_groups, aes(x = median_balance, y = marital_education, fill = marital_education)) +
+  geom_bar(stat = "identity", alpha = 0.7) +
+  scale_fill_manual(values = colors) +  # Use the defined color palette
+  labs(title = "Median Balance by Educational/Marital Group", 
+       x = "Median Balance", 
+       y = "Educational/Marital Group") +
+  theme_minimal()
+
+# Display the plot
+print(bar_plot)
+
+```
+```{r}
+# Group by job and calculate the response rate
+occupation_response <- df %>%
+  group_by(job) %>%
+  summarise(response_rate = mean(deposit == "yes"))
+
+# Find the occupation with the highest response rate
+targeted_occupation <- occupation_response %>%
+  filter(response_rate == max(response_rate)) %>%
+  pull(job)
+
+cat("Targeted Occupation:", targeted_occupation, "\n")
+```
+```{r}
+# Group by job and calculate the number of deposits
+occupation_deposits <- df %>%
+  filter(deposit == "yes") %>%
+  group_by(job) %>%
+  summarise(total_deposits = n())
+
+# Find the occupation with the highest number of deposits
+targeted_occupation <- occupation_deposits %>%
+  filter(total_deposits == max(total_deposits)) %>%
+  pull(job)
+
+cat("Targeted Occupation (by deposits):", targeted_occupation, "\n")
+```
+
+
+
+
+
+```{r}
+# Boxplot
+ggplot(df, aes(x = job, y = age)) +
+  geom_boxplot(fill = "#64FE2E") +
+  labs(title = "Distribution of Ages by Occupation", x = "Occupation", y = "Age") +
+  theme_minimal()
+
+# Violin plot
+ggplot(df, aes(x = job, y = age, fill = job)) +
+  geom_violin() +
+  labs(title = "Distribution of Ages by Occupation", x = "Occupation", y = "Age") +
+  scale_fill_manual(values = c("#64FE2E", "#FA5858", "#FFD700", "#4169E1", "#FF69B4", "#8B4513", "#800080", "#00FFFF", "#FF4500", "#808080", "#FF8C00", "#8A2BE2")) +
+  theme_minimal()
+```
+
+
+
+```{r}
+ggplot(df, aes(x = balance, y = duration, color = deposit)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Balance vs. Duration", x = "Balance", y = "Duration", color = "Deposit") +
+  scale_color_manual(values = c("#FA5858", "#64FE2E")) +
+  theme_minimal()
+```
+
+
+
+```{r}
+# Order job variable
+df$job <- factor(df$job, levels = c('unknown', 'blue-collar', 'entrepreneur', 'housemaid', 'management', 'retired', 'self-employed', 'services', 'student', 'technician', 'unemployed', 'admin.'))
+df$job <- as.numeric(df$job) - 1  # Subtract 1 to make it 0-indexed
+
+# Order marital variable
+df$marital <- factor(df$marital, levels = c('unknown', 'divorced', 'married', 'single'))
+df$marital <- as.numeric(df$marital) - 1  # Subtract 1 to make it 0-indexed
+
+# Order default variable
+df$default <- factor(df$default, levels = c('unknown', 'no', 'yes'))
+df$default <- as.numeric(df$default == 'yes')  # Convert 'yes' to 1, others to 0
+
+# Order housing variable
+df$housing <- factor(df$housing, levels = c('unknown', 'no', 'yes'))
+df$housing <- as.numeric(df$housing)  # Already binary, so no need to subtract 1
+
+# Order loan variable
+df$loan <- factor(df$loan, levels = c('unknown', 'no', 'yes'))
+df$loan <- as.numeric(df$loan)  # Already binary, so no need to subtract 1
+
+# Order education variable
+df$education <- factor(df$education, levels = c('unknown', 'primary', 'secondary', 'tertiary'))
+df$education <- as.numeric(df$education) - 1  # Convert to 0 for 'unknown', 1 for 'primary', 2 for 'secondary', 3 for 'tertiary'
+
+
+# Order contact variable
+df$contact <- factor(df$contact, levels = c('telephone', 'cellular'))
+df$contact <- as.numeric(df$contact)  # Already binary, so no need to subtract 1
+
+# Order month variable
+df$month <- factor(df$month, levels = c('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'))
+df$month <- as.numeric(df$month)  # Subtract 1 to make it 0-indexed
+
+
+# Convert deposit to binary
+df$deposit <- as.numeric(df$deposit == 'yes')
+
+
+# Display the first few rows of the updated dataset
+head(df)
+
+```
+
+
+```{r}
+# Drop 'contact' and 'poutcome' columns
+df <- df[, !(names(df) %in% c("contact", "poutcome"))]
+```
+
+
+
+
+```{r}
+cor_matrix <- cor(df[, c("age", "balance", "duration", "campaign", "pdays", "previous")])
+
+# Print the correlation matrix
+print(cor_matrix)
+
+```
+```{r}
+library(corrplot)
+
+# Set up the plotting area
+par(mar = c(2, 2, 2, 2))  # Adjust the margins if needed
+
+# Create a heatmap of the correlation matrix with correlation coefficients
+corrplot(cor_matrix, method = "color", type = "full", order = "hclust", tl.cex = 0.8, addCoef.col = "black")
+
+# Add a title
+title(main = "Correlation Heatmap")
+
+```
+
+```{r}
+
+# Bar plot of campaign distribution
+barplot(table(df$campaign), main = "Distribution of Campaigns", xlab = "Campaign", ylab = "Count")
+```
+
+
+
+
+```{r}
+summary(df)
+colSums(is.na(df))
+
+```
+
+```{r}
+# Create a binary treatment variable
+df$treatment_binary <- ifelse(df$campaign %in% 1:4, 1, 0)
+
+# Check the distribution of the new binary treatment variable
+table(df$treatment_binary)
+```
+
+
+
+```{r}
+# Load the necessary libraries
+library(MatchIt)
+library(WeightIt)
+library(tidyverse)
+
+# Specify the treatment and covariates
+treatment_variable <- "treatment_binary"
+covariates <- c("age", "job", "marital", "education", "default", "balance", "housing", 
+                "loan", "day", "month", "duration", "pdays", "previous")
+
+# Create a formula for the treatment variable
+treatment_formula <- as.formula(paste(treatment_variable, "~", paste(covariates, collapse = "+")))
+
+# Estimate the propensity scores
+ps_model <- ps(treatment_formula, data = df, method = "binomial", maxit = 100)
+
+# Estimate the ATE using the MatchIt package
+matched_data <- matchit(treatment_formula, data = df, method = "nearest", ratio = 1)
+
+# Calculate the ATE
+ate_model <- lm(deposit ~ treatment_binary, data = match.data(matched_data))
+ate <- mean(ate_model$coef[2])
+
+# Display the ATE
+cat("Estimated Average Treatment Effect (ATE):", round(ate, 4), "\n")
+
+# Display more information about the regression model
+summary(ps_model)
+summary(ate_model)
+
+
+```
+
+
+
+```{r}
+library(ggplot2)
+
+# df is my data frame
+df$campaign_binary <- ifelse(df$campaign <= 4, 1, 0)
+
+# Plot the distribution of the outcome variable for treated and control groups
+ggplot(df, aes(x = deposit, fill = factor(campaign_binary))) +
+  geom_bar(position = "dodge") +
+  labs(title = "Distribution of Deposit by Treatment Group",
+       x = "Deposit",
+       y = "Count",
+       fill = "Campaign Group") +
+  theme_minimal()
+
+```
+```{r}
+summarise(matched_data)
+
+```
+
+```{r}
+# Assuming 'matched_data' has been previously calculated
+library(tidyverse)
+
+# Calculate standardized mean differences before and after matching
+balance_table <- map_dfr(covariates, function(covariate) {
+  before_match <- df %>%
+    group_by(treatment_binary) %>%
+    summarize(mean_treat = mean(.data[[covariate]], na.rm = TRUE))
+
+  after_match <- matched_data %>%
+    group_by(treatment_binary) %>%
+    summarize(mean_treat = mean(.data[[covariate]], na.rm = TRUE))
+
+  data.frame(
+    variable = covariate,
+    standardized.diff = (after_match$mean_treat[2] - after_match$mean_treat[1]) /
+      sqrt((before_match$mean_treat[1] + before_match$mean_treat[2]) / 2)
+  )
+})
+
+# Plot standardized mean differences
+balance_plot <- ggplot(balance_table, aes(x = as.factor(variable), y = standardized.diff)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  ggtitle("Standardized Mean Differences Before and After Matching") +
+  xlab("Covariate") +
+  ylab("Standardized Mean Difference") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Display the balance plot
+print(balance_plot)
+
+
+```
+
+
+
+
+
+```{r}
+# and 'deposit' is the outcome variable
+boxplot(deposit ~ treatment_binary, data = df, col = c("blue", "red"),
+        main = "Average Treatment Effect (ATE) Visualization",
+        xlab = "Treatment Group", ylab = "Outcome Variable")
+
+```
+
+```{r}
+# Histogram
+hist(df$deposit[df$treatment_binary == 0], col = "blue", xlim = c(min(df$deposit), max(df$deposit)),
+     main = "Distribution of Outcome Variable by Group",
+     xlab = "Outcome Variable", ylab = "Frequency", density = 30, alpha = 0.5)
+hist(df$deposit[df$treatment_binary == 1], col = "red", add = TRUE, density = 30, alpha = 0.5)
+legend("topright", legend = c("Control", "Treatment"), fill = c("blue", "red"))
+
+# Density plot
+plot(density(df$deposit[df$treatment_binary == 0]), col = "blue", lwd = 2,
+     main = "Kernel Density Plot of Outcome Variable by Treatment Status",
+     xlab = "Outcome Variable", ylab = "Density")
+lines(density(df$deposit[df$treatment_binary == 1]), col = "red", lty = 2, lwd = 2)
+legend("topright", legend = c("Control", "Treatment"), fill = c("blue", "red"))
+```
+```{r}
+
+```
+
+
